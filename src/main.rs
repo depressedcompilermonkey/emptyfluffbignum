@@ -4,6 +4,7 @@ fn main() {
     println!("Most stuff is not implemented yet. Please bear with us.");
     println!("The stuff that is implemented is not tested, and often incorrect; we are working on our testing framework.");
     println!("Currently you can create a BigIntArbitraryBase object from a string, make comparisons, do addition.");
+    println!("Subtraction, multiplication, division, etc are not implemented yet.");
     println!("Math is performed primarly in u64, to catch all of the carries and etc.");
     println!("Digits are stored in an u32 and therefore the highest base is 4 294 967 295 (2^32 - 1).");
     println!("It is recommended to use base 1 000 000 000 for applications where the math mostly stays in base10.");
@@ -11,7 +12,11 @@ fn main() {
     println!("");
     use emptyfluffbignum::BigIntArbitraryBase;
     let mut num_a: BigIntArbitraryBase = BigIntArbitraryBase::new(10);
-    let mut num_b: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r-4_5_5_4_2_5_4_3".to_string());
+    let mut num_b: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r5_5_5_5".to_string());
+    let mut num_c: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r-3_3_3_3".to_string());
+    let mut num_d: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r1_1_1_1".to_string());
+    let mut num_e: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r9_9_9_9".to_string());
+    println!("");
     println!("Number created: {}", num_a.to_string());
     println!("Number created: {}", num_b.to_string());
     println!("Number created: {}", num_b.add(&num_b).to_string());
@@ -20,8 +25,10 @@ fn main() {
     if (num_a.add(&num_b)).compare_less(&num_a) {
         println!("num_a is less");
     } else {
-        println!("num_a is equal or greater");
+        println!("{} is equal or greater than {}", num_a.add(&num_b).to_string(), &num_a.to_string());
     }
+
+    println!("{} - {} = {}", num_e.to_string(), num_b.to_string(), num_e.multiply(&num_b).to_string());
 }
 
 mod emptyfluffbignum {
@@ -58,28 +65,26 @@ mod emptyfluffbignum {
          * 32789723 - no base specified, assumed base ten
          * 10r7_2_8_9_2 - base 10 with 5 digits separated by underscores
          * 207r62_47_108_206 - base 207 with 4 digits separated by underscores
+         * 207r-62_47_108_206 - as above, but negative
          */
+         // function returns a 0 bigint on a fail
         pub fn from_string(whole_text: String) -> Self {
 
             let mut negative_flag: bool = false;
 
-            // return zero if not valid parameters
+            // text must be ascii
             if !whole_text.is_ascii() {
-                println!("BigIntArbitraryBase::from_string({}) was given non-ascii text. Created a 0 number instead.", whole_text);
                 return Self::new(10);
             }
 
-            // check that there is only one instance of r
+            // exactly 1 instance of 'r' is allowed
             if whole_text.chars().filter(|c| *c == 'r').count() != 1 {
-                println!("Incorrect format detected. Number of occurrances of 'r' is not 1.");
                 return Self::new(10);
             }
 
-            // find the index of r, split the string into two parts at that point
-            // split by "r". there should be two elements in the resultant Vec.
-            let text_parts: Vec<String> = whole_text.split("r").map(|s| s.to_string()).collect();
+            // split at 'r', only exactly 2 non-empty strings is allowed
+            let text_parts: Vec<String> = whole_text.split("r").filter(|s| s.chars().count() > 0).map(|s| s.to_string()).collect();
             if text_parts.len() != 2 {
-                println!("Incorrect format detected. Parts after splitting on 'r' is not 2.");
                 return Self::new(10);
             }
             let mut radix_text: String = text_parts[0].clone();
@@ -88,18 +93,35 @@ mod emptyfluffbignum {
 
             // get the radix as a number
             let mut radix: u32 = 2;
-            let mut signed_radix: i64 = radix_text.parse().unwrap();
-            radix = signed_radix.abs() as u32;
-            if signed_radix < 0 {
-                negative_flag = true;
+            let mut radix: u32 = radix_text.parse().unwrap();
+            println!("radix: {}", &radix);
+
+            // print the number text
+            println!("number_text: {}", numbers_text);
+
+            // split the numbers part by '-'
+            let mut numbers_text_split: Vec<String> = numbers_text.split("-").map(|c| c.to_string()).collect();
+
+            // there must be only 1 or 2 elements in the list
+            if numbers_text_split.len() > 2 {
+                println!("Parse failed: Only one '-' allowed.");
+                return Self::new(10);
             }
-            println!("signed_radix, radix: {}, {}", &signed_radix, &radix);
-            if negative_flag {
+
+            // '-' is only allowed to exist at the front of the number
+            if numbers_text_split.len() > 1 && numbers_text_split[0].len() > 0 {
+                println!("Parse failed: Only allowed one '-' per number.");
+                return Self::new(10);
+            }
+
+            // set negative_flag if appropriate
+            if numbers_text_split.len() > 1 {
                 println!("negative");
+                negative_flag = true;
             }
 
             // convert the numbers text into a list of numbers
-            let mut numbers: Vec<u32> = numbers_text.split("_").map(|s| s.parse().unwrap()).collect();
+            let mut numbers: Vec<u32> = numbers_text.chars().filter(|c| *c != '-').collect::<String>().split("_").map(|s| s.parse().unwrap()).collect();
 
             // ensure they are all less than the radix
             if !numbers.iter().all(|i| i < &radix) {
@@ -113,6 +135,7 @@ mod emptyfluffbignum {
             for x in numbers.iter().rev() {
                 result.values.push(*x);
             }
+
             result.negative_flag = negative_flag;
 
             result
@@ -137,7 +160,7 @@ mod emptyfluffbignum {
             result
         }
 
-        // zero if one number in the array and it is the value zero
+        // zero if only one element in the array and it is the value zero
         // assume leading zeros will always be pre-cleared
         pub fn is_zero(self: &Self) -> bool {
             if self.values.len() != 1 {
@@ -175,7 +198,6 @@ mod emptyfluffbignum {
             let mut result: Self = Self::new((2 as u32).pow(32));
             let mut multiplier: u32 = 1;
             for i in 0..self.values.len() {
-                ;
                 // result = result.add(self.values[i]);
             }
 
@@ -244,7 +266,7 @@ mod emptyfluffbignum {
             }
 
             // assume that they have the same number of digits
-            for i in 0..len_self.max(len_operand) {
+            for i in (0..len_self.max(len_operand)).rev() {
                 let mut num_self: u32 = self.values[i];
                 let mut num_operand: u32 = operand.values[i];
                 if num_self == num_operand {
@@ -297,7 +319,8 @@ mod emptyfluffbignum {
             return self.add_absolutes(operand);
         }
 
-        // TODO: incomplete
+        // adds absolute value of two numbers together
+        // assumes radix is the same
         pub fn add_absolutes(self: &Self, operand: &Self) -> Self {
 
             // determine the highest_index
@@ -331,18 +354,107 @@ mod emptyfluffbignum {
         }
 
         // TODO: incomplete
-        pub fn multiply(self: &Self, operand: &Self) -> Self {
-            return Self::new(10);
-        }
-
-        // TODO: incomplete
         pub fn subtract(self: &Self, operand: &Self) -> Self {
-            return Self::new(10);
+
+            let mut result: Self = Self::new(10);
+
+            result
+        }
+
+        // does not check sign
+        // assumes operand is less than self
+        // assumes same radix
+        pub fn subtract_absolutes(self: &Self, operand: &Self) -> Self {
+            let mut result: Self = Self::new(10);
+            result.values.clear();
+            let mut radix: i64 = self.radix as i64;
+            let mut max_index = self.values.len().max(operand.values.len());
+
+            let mut borrow_flag: bool = false;
+            for i in 0..=max_index {
+                let mut num_self: i64 = 0;
+                if i < self.values.len() {
+                    num_self = self.values[i] as i64;
+                }
+                let mut num_operand: i64 = 0;
+                if i < operand.values.len() {
+                    num_operand = operand.values[i] as i64;
+                }
+                let mut temp_result = num_self - num_operand;
+                if borrow_flag {
+                    temp_result -= 1;
+                }
+                borrow_flag = false;
+                if temp_result < 0 {
+                    borrow_flag = true;
+                    temp_result += radix;
+                }
+                result.values.push(temp_result as u32);
+            }
+
+            result.trim_leading_zeros();
+
+            result
         }
 
         // TODO: incomplete
-        pub fn subtract_absolutes(self: &Self, operand: &Self) -> Self {
-            return Self::new(10);
+        pub fn multiply(self: &Self, operand: &Self) -> Self {
+            let mut result: Self = Self::new(10);
+
+            // ensure the radix is the same
+            if self.radix != operand.radix {
+                return self.multiply(&operand.as_new_radix(&self.radix));
+            }
+
+            let mut result: Self = Self::new(10);
+            result.values.clear();
+
+            /*
+             * for each digit in self
+             *     carry = 0
+             *     for each digit in operand + 1
+             *         temp = 0, push 0s for each i_self
+             *         temp = self[i] * operand[j] + carry
+             *         high_part = temp / radix
+             *         low_part = temp - high_part * radix
+             *         carry = carry = high_part
+             *     result += temp
+             * return result
+             */
+
+             let radix: u64 = self.radix as u64;
+             for i_self in 0..self.values.len() {
+                 let mut carry: u64 = 0;
+                 let mut temp_sum: Self = Self::new(self.radix);
+                 temp_sum.values.clear();
+                 for i in 0..i_self {
+                     temp_sum.values.push(0);
+                 }
+                 for i_operand in 0..=operand.values.len() {
+                     let mut temp_product: u64 = 0;
+                     let mut num_self: u64 = 0;
+                     if i_self < self.values.len() {
+                         num_self = self.values[i_self] as u64;
+                     }
+                     let mut num_operand: u64 = 0;
+                     if i_operand < operand.values.len() {
+                         num_operand = operand.values[i_operand] as u64;
+                     }
+                     temp_product = carry + num_self * num_operand;
+                     let high_part: u64 = temp_product / radix;
+                     let low_part: u64 = temp_product - high_part * radix;
+                     temp_sum.values.push(low_part as u32);
+                     carry = high_part;
+                 }
+                 result = result.add(&temp_sum);
+             }
+
+
+
+
+            result.negative_flag = self.negative_flag ^ operand.negative_flag;
+
+            result
         }
 
         // TODO: incomplete

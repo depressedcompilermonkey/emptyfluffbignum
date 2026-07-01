@@ -5,8 +5,8 @@ fn main() {
     println!("The stuff that is implemented is not tested, and often incorrect; we are working on our testing framework.");
     println!("Currently you can create a BigIntArbitraryBase object from a string, make comparisons, do addition.");
     println!("Subtraction, multiplication, division, etc are not implemented yet.");
-    println!("Math is performed primarly in u64, to catch all of the carries and etc.");
-    println!("Digits are stored in an u32 and therefore the highest base is 4 294 967 295 (2^32 - 1).");
+    println!("Math between different radixes is possible through automatic conversion but will be slower than if they already had the same radix.");
+    println!("Digits are stored in an u32 and therefore the highest base is 4 294 967 295 (2**32 - 1).");
     println!("It is recommended to use base 1 000 000 000 for applications where the math mostly stays in base10.");
 
     println!("");
@@ -29,6 +29,8 @@ fn main() {
     }
 
     println!("{} - {} = {}", num_e.to_string(), num_b.to_string(), num_e.multiply(&num_b).to_string());
+    println!("{} negated is {} negated is {}", num_b.to_string(), num_b.negation().to_string(), num_b.negation().negation().to_string());
+    println!("{} - {} = {}", num_b.to_string(), num_e.to_string(), num_b.subtract(&num_e).to_string());
 }
 
 mod emptyfluffbignum {
@@ -182,6 +184,17 @@ mod emptyfluffbignum {
             return !self.is_zero() && !self.is_negative();
         }
 
+        // create a new bigint with the opposite sign
+        pub fn negation(self: &Self) -> Self {
+            let mut result: Self = Self::new(self.radix);
+            result.values.clear();
+            for x in self.values.iter() {
+                result.values.push(*x);
+            }
+            result.negative_flag = ! self.negative_flag;
+            result
+        }
+
         /*
          * Convert $operand to the same radix as self.radix.
          * For practical reasons, this uses 2**32 as an intermediate radix.
@@ -218,6 +231,7 @@ mod emptyfluffbignum {
             }
         }
 
+        // return true if self is less than operand
         pub fn compare_less(self: &Self, operand: &Self) -> bool {
 
             // if radix mismatch, convert operand and compare that instead
@@ -243,7 +257,7 @@ mod emptyfluffbignum {
             // signs must be equal at this point
             // the previous comparisons mean this must be true
             if sign_self == 1 { // they're both positive
-                self.compare_less_absolutes(operand);
+                return self.compare_less_absolutes(operand);
             }
 
             // the only scenario that was not handled is that both numbers are negative
@@ -309,11 +323,11 @@ mod emptyfluffbignum {
             }
 
             if operand.is_negative() {
-                return self.subtract(operand);
+                return self.subtract(&operand.negation());
             }
 
             if self.is_negative() {
-                return operand.subtract(self);
+                return operand.subtract(&self.negation());
             }
 
             return self.add_absolutes(operand);
@@ -353,10 +367,36 @@ mod emptyfluffbignum {
             result
         }
 
-        // TODO: incomplete
+        // TODO: fix
         pub fn subtract(self: &Self, operand: &Self) -> Self {
 
             let mut result: Self = Self::new(10);
+
+            // subtracting a negative means adding a positive
+            if operand.is_negative() {
+                return self.add(&operand.negation());
+            }
+            // operand is not negative from here on
+
+            if self.is_negative() {
+                // add absolutes and make negative
+                result = self.add_absolutes(operand);
+                result.negative_flag = true;
+                return result;
+            }
+            // self is not negative from here on
+
+            // self subtract operand (both positive)
+            // larger - smaller
+            // if self was smaller, make result negative
+            if self.compare_less(operand) {
+                println!("Self was deemed less than operand.");
+                result = operand.subtract_absolutes(self);
+                result.negative_flag = true;
+            } else {
+                println!("Self was deemed greater than operand.");
+                result = self.subtract_absolutes(operand);
+            }
 
             result
         }
@@ -448,9 +488,6 @@ mod emptyfluffbignum {
                  }
                  result = result.add(&temp_sum);
              }
-
-
-
 
             result.negative_flag = self.negative_flag ^ operand.negative_flag;
 

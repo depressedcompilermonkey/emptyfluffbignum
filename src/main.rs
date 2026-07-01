@@ -11,11 +11,13 @@ fn main() {
 
     println!("");
     use emptyfluffbignum::BigIntArbitraryBase;
-    let mut num_a: BigIntArbitraryBase = BigIntArbitraryBase::new(10);
+    let mut num_a: BigIntArbitraryBase = BigIntArbitraryBase::new_zero(10);
     let mut num_b: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r5_5_5_5".to_string());
     let mut num_c: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r-3_3_3_3".to_string());
     let mut num_d: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r1_1_1_1".to_string());
     let mut num_e: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r9_9_9_9".to_string());
+    let mut num_f: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r2_3".to_string());
+    let mut num_g: BigIntArbitraryBase = BigIntArbitraryBase::from_string("10r3".to_string());
     println!("");
     println!("Number created: {}", num_a.to_string());
     println!("Number created: {}", num_b.to_string());
@@ -31,6 +33,10 @@ fn main() {
     println!("{} - {} = {}", num_e.to_string(), num_b.to_string(), num_e.multiply(&num_b).to_string());
     println!("{} negated is {} negated is {}", num_b.to_string(), num_b.negation().to_string(), num_b.negation().negation().to_string());
     println!("{} - {} = {}", num_b.to_string(), num_e.to_string(), num_b.subtract(&num_e).to_string());
+    println!("{} / {} = {}", num_e.to_string(), num_f.to_string(), num_e.divide(&num_f).to_string());
+    println!("{} / {} = {}", num_f.to_string(), num_e.to_string(), num_f.divide(&num_e).to_string());
+    println!("{} % {} = {}", num_e.to_string(), num_f.to_string(), num_e.modulus(&num_f).to_string());
+    println!("{} / {} = {}", num_f.to_string(), num_g.to_string(), num_f.divide(&num_g).to_string());
 }
 
 mod emptyfluffbignum {
@@ -42,7 +48,19 @@ mod emptyfluffbignum {
     }
 
     impl BigIntArbitraryBase {
-        pub fn new(radix: u32) -> Self {
+        // assumes that the radix is valid
+        // assumes that the values are each less than the radix
+        // TODO: add safety
+        pub fn new(radix: u32, values: Vec<u32>, negative_flag: bool) -> Self {
+            let mut result = Self {
+                values: values,
+                radix: radix,
+                negative_flag: negative_flag,
+            };
+            result
+        }
+
+        pub fn new_zero(radix: u32) -> Self {
             let mut result = Self {
                 values: vec![0],
                 radix: radix,
@@ -51,9 +69,28 @@ mod emptyfluffbignum {
             result
         }
 
+        pub fn new_one(radix: u32) -> Self {
+            let mut result = Self {
+                values: vec![1],
+                radix: radix,
+                negative_flag: false,
+            };
+            result
+        }
+
         // create a maximum value radix number (radix of 2**32)
+        // TODO: this could cause me problems later. 2**32 is not useable. Max is 1 less.
         fn new_with_max_radix() -> Self {
-            return Self::new((2 as u32).pow(32));
+            return Self::new(((2 as u64).pow(32) - 1) as u32, vec![0], false);
+        }
+
+        fn new_clone(self: &Self) -> Self {
+            let mut result = Self {
+                values: self.values.clone(),
+                radix: self.radix,
+                negative_flag: self.negative_flag,
+            };
+            result
         }
 
         /*
@@ -76,18 +113,18 @@ mod emptyfluffbignum {
 
             // text must be ascii
             if !whole_text.is_ascii() {
-                return Self::new(10);
+                return Self::new_zero(10);
             }
 
             // exactly 1 instance of 'r' is allowed
             if whole_text.chars().filter(|c| *c == 'r').count() != 1 {
-                return Self::new(10);
+                return Self::new_zero(10);
             }
 
             // split at 'r', only exactly 2 non-empty strings is allowed
             let text_parts: Vec<String> = whole_text.split("r").filter(|s| s.chars().count() > 0).map(|s| s.to_string()).collect();
             if text_parts.len() != 2 {
-                return Self::new(10);
+                return Self::new_zero(10);
             }
             let mut radix_text: String = text_parts[0].clone();
             println!("radix_text: {}", &radix_text);
@@ -107,13 +144,13 @@ mod emptyfluffbignum {
             // there must be only 1 or 2 elements in the list
             if numbers_text_split.len() > 2 {
                 println!("Parse failed: Only one '-' allowed.");
-                return Self::new(10);
+                return Self::new_zero(10);
             }
 
             // '-' is only allowed to exist at the front of the number
             if numbers_text_split.len() > 1 && numbers_text_split[0].len() > 0 {
                 println!("Parse failed: Only allowed one '-' per number.");
-                return Self::new(10);
+                return Self::new_zero(10);
             }
 
             // set negative_flag if appropriate
@@ -128,11 +165,11 @@ mod emptyfluffbignum {
             // ensure they are all less than the radix
             if !numbers.iter().all(|i| i < &radix) {
                 println!("One of the parts of the number is not smaller than the radix. Invalid format.");
-                return Self::new(10);
+                return Self::new_zero(10);
             }
 
             // convert integer list to a number
-            let mut result: BigIntArbitraryBase = Self::new(10);
+            let mut result: BigIntArbitraryBase = Self::new_zero(10);
             result.values.clear();
             for x in numbers.iter().rev() {
                 result.values.push(*x);
@@ -144,12 +181,9 @@ mod emptyfluffbignum {
         }
 
         pub fn to_string(self: &Self) -> String {
-            println!("");
-            println!("to_string() called. values.len(): {}", self.values.len());
             let mut result: String = String::new();
             result = self.radix.to_string() + "r";
             if self.is_negative() {
-                println!("Printing a negative number.");
                 result += "-";
             }
             for i in (0..self.values.len()).rev() {
@@ -186,7 +220,7 @@ mod emptyfluffbignum {
 
         // create a new bigint with the opposite sign
         pub fn negation(self: &Self) -> Self {
-            let mut result: Self = Self::new(self.radix);
+            let mut result: Self = Self::new_zero(self.radix);
             result.values.clear();
             for x in self.values.iter() {
                 result.values.push(*x);
@@ -208,7 +242,7 @@ mod emptyfluffbignum {
          */
          // TODO: incomplete
         pub fn as_new_radix(self: &Self, new_radix: &u32) -> Self {
-            let mut result: Self = Self::new((2 as u32).pow(32));
+            let mut result: Self = Self::new_with_max_radix();
             let mut multiplier: u32 = 1;
             for i in 0..self.values.len() {
                 // result = result.add(self.values[i]);
@@ -338,7 +372,7 @@ mod emptyfluffbignum {
         pub fn add_absolutes(self: &Self, operand: &Self) -> Self {
 
             // determine the highest_index
-            let mut result: Self = Self::new(self.radix);
+            let mut result: Self = Self::new_zero(self.radix);
             result.values.clear();
             let mut max_index = self.values.len().max(operand.values.len());
             let mut carry = 0;
@@ -370,7 +404,7 @@ mod emptyfluffbignum {
         // TODO: fix
         pub fn subtract(self: &Self, operand: &Self) -> Self {
 
-            let mut result: Self = Self::new(10);
+            let mut result: Self = Self::new_zero(self.radix);
 
             // subtracting a negative means adding a positive
             if operand.is_negative() {
@@ -390,11 +424,9 @@ mod emptyfluffbignum {
             // larger - smaller
             // if self was smaller, make result negative
             if self.compare_less(operand) {
-                println!("Self was deemed less than operand.");
                 result = operand.subtract_absolutes(self);
                 result.negative_flag = true;
             } else {
-                println!("Self was deemed greater than operand.");
                 result = self.subtract_absolutes(operand);
             }
 
@@ -405,7 +437,7 @@ mod emptyfluffbignum {
         // assumes operand is less than self
         // assumes same radix
         pub fn subtract_absolutes(self: &Self, operand: &Self) -> Self {
-            let mut result: Self = Self::new(10);
+            let mut result: Self = Self::new_zero(self.radix);
             result.values.clear();
             let mut radix: i64 = self.radix as i64;
             let mut max_index = self.values.len().max(operand.values.len());
@@ -439,14 +471,14 @@ mod emptyfluffbignum {
 
         // TODO: incomplete
         pub fn multiply(self: &Self, operand: &Self) -> Self {
-            let mut result: Self = Self::new(10);
+            let mut result: Self = Self::new_zero(self.radix);
 
             // ensure the radix is the same
             if self.radix != operand.radix {
                 return self.multiply(&operand.as_new_radix(&self.radix));
             }
 
-            let mut result: Self = Self::new(10);
+            let mut result: Self = Self::new_zero(self.radix);
             result.values.clear();
 
             /*
@@ -465,7 +497,7 @@ mod emptyfluffbignum {
              let radix: u64 = self.radix as u64;
              for i_self in 0..self.values.len() {
                  let mut carry: u64 = 0;
-                 let mut temp_sum: Self = Self::new(self.radix);
+                 let mut temp_sum: Self = Self::new_zero(self.radix);
                  temp_sum.values.clear();
                  for i in 0..i_self {
                      temp_sum.values.push(0);
@@ -494,9 +526,53 @@ mod emptyfluffbignum {
             result
         }
 
-        // TODO: incomplete
+        // assume radix is the same
+        pub fn divide_lazy(self: &Self, operand: &Self) -> Self {
+
+            let mut result: Self = Self::new_zero(self.radix);
+            let mut inc: Self = Self::new_one(self.radix);
+            let mut sum: Self = operand.new_clone();
+            while sum.compare_less(self) {
+                result = result.add(&inc);
+                sum = sum.add(operand);
+            }
+
+            result.negative_flag = self.negative_flag ^ operand.negative_flag;
+            result
+        }
+
+        /*
+         * Currently, divide() just passes through to divide_lazy().
+         * (divide_lazy() just adds $operand to itself and counts the times until it hits $self)
+         */
+        // TODO: upgrade
         pub fn divide(self: &Self, operand: &Self) -> Self {
-            return Self::new(10);
+            if self.radix != operand.radix {
+                return self.divide(&operand.as_new_radix(&self.radix));
+            }
+            if self.compare_less_absolutes(operand) {
+                return Self::new_zero(self.radix);
+            }
+            return self.divide_lazy(operand);
+
+            let mut result: Self = Self::new_zero(self.radix);
+
+            /*
+             * Actual implementation would go here.
+             * Pro tip: you can use the new .shift_left() and .shift_right() functions.
+             */
+
+            result
+        }
+
+        // returns the remainder of an integer division
+        // div = self/operand
+        // return self - div*operand
+        // TODO: doesn't compare radix
+        // TODO: doesn't compare sign
+        // TODO: doesn't even look at sign
+        pub fn modulus(self: &Self, operand: &Self) -> Self {
+            return self.subtract(&(self.divide(operand)).multiply(operand));
         }
     }
 }

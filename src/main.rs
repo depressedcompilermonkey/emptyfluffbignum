@@ -37,6 +37,12 @@ fn main() {
     println!("{} / {} = {}", num_f.to_string(), num_e.to_string(), num_f.divide(&num_e).to_string());
     println!("{} % {} = {}", num_e.to_string(), num_f.to_string(), num_e.modulus(&num_f).to_string());
     println!("{} / {} = {}", num_f.to_string(), num_g.to_string(), num_f.divide(&num_g).to_string());
+    println!("{} << 1 = {}", num_e.to_string(), num_e.shift_left().to_string());
+    println!("{} >> 1 = {}", num_e.to_string(), num_e.shift_right().to_string());
+    println!("{} >> 2 = {}", num_e.to_string(), num_e.shift_right().shift_right().to_string());
+    println!("{} >> 3 = {}", num_e.to_string(), num_e.shift_right().shift_right().shift_right().to_string());
+    println!("{} >> 4 = {}", num_e.to_string(), num_e.shift_right().shift_right().shift_right().shift_right().to_string());
+    println!("{} >> 5 = {}", num_e.to_string(), num_e.shift_right().shift_right().shift_right().shift_right().shift_right().to_string());
 }
 
 mod emptyfluffbignum {
@@ -340,6 +346,33 @@ mod emptyfluffbignum {
                 return -1;
             }
             return 0;
+        }
+
+        // insert zeros
+        // creates a new bigint
+        // TODO: untested
+        pub fn shift_left(self: &Self) -> Self {
+
+            let mut result: Self = self.new_clone();
+            result.values.insert(0, 0);
+            result.trim_leading_zeros();
+            result
+        }
+
+        // insert zeros
+        // creates a new bigint
+        // TODO: untested
+        pub fn shift_right(self: &Self) -> Self {
+
+            let mut result: Self = self.new_clone();
+            if result.values.len() > 0 {
+                result.values.remove(0);
+            }
+            if result.values.len() == 0 {
+                result.values.push(0);
+            }
+            result.trim_leading_zeros();
+            result
         }
     }
 
